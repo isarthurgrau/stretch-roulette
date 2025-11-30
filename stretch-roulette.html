@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stretch Roulette</title>
+    <title>Random Wheel Spinner 1-18 (Responsive Grayscale)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -19,16 +19,25 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            /* Remove min-height: 100vh to allow the content to drive the height */
         }
         
-        /* The main wheel container */
-        #wheelContainer {
+        /* The main wheel container, result overlay, and wheel area container maintain 
+           a fixed 300px size to keep number positioning correct. 
+        */
+        #wheelContainer, .wheel-area-container {
             position: relative;
-            width: 300px;
-            height: 300px;
-            cursor: pointer;
+            width: 300px; /* Fixed size for correct number positioning */
+            height: 300px; /* Fixed size for correct number positioning */
             border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The main wheel container specific styles */
+        #wheelContainer {
+            cursor: pointer;
             border: 2px solid #6f6f6f;
             overflow: hidden; 
             transition: transform 5s cubic-bezier(0.25, 0.1, 0.0, 1.0);
@@ -71,12 +80,14 @@
 
         /* Overlay for the result */
         #resultOverlay {
-            position: absolute;
+            /* Now covers the parent wheelContainer exactly */
+            position: absolute; 
             top: 0;
             left: 0;
-            width: 300px;
-            height: 300px;
+            width: 100%;
+            height: 100%;
             border-radius: 50%;
+            
             background-color: rgba(255, 255, 255, 0.95);
             color: #6f6f6f;
             display: none;
@@ -87,6 +98,9 @@
             z-index: 20;
             pointer-events: none; 
             border: 3px solid #6f6f6f;
+            
+            /* Add transition for the counter-rotation to look smooth on display */
+            transition: transform 0.1s ease-out;
         }
 
         #winningNumber {
@@ -94,26 +108,6 @@
             font-size: 5rem; 
             font-weight: 900;
             line-height: 1;
-        }
-
-        .wheel-area-container {
-            position: relative;
-            width: 300px;
-            height: 300px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Aspect Ratio Utility for the Frame */
-        .aspect-video-frame {
-            aspect-ratio: 16 / 9;
-            width: 100%;
-            max-width: 1920px; 
-            background-color: #ffffff;
-            position: relative;
-            overflow: hidden;
-            display: flex;
         }
 
         /* Fade in animation for the prize image */
@@ -130,25 +124,28 @@
 </head>
 <body>
 
-    <!-- Scalable 1920x1080 Frame -->
-    <div class="w-full max-w-[1920px] p-4 md:p-8 flex justify-center items-center">
+    <!-- Main Responsive Frame Container -->
+    <div class="w-full p-0 flex justify-center items-start">
         
-        <div class="aspect-video-frame rounded-sm">
+        <!-- Content Area: Responsive Stack (Mobile) vs Row (Desktop) -->
+        <div class="w-full bg-white flex flex-col md:flex-row shadow-2xl max-w-7xl">
             
-            <!-- LEFT COLUMN (40% Width) -->
-            <div class="w-2/5 h-full flex items-center justify-center p-8 border-r border-gray-100">
+            <!-- LEFT COLUMN (Wheel Area) -->
+            <!-- Full width on mobile, 40% width on desktop -->
+            <div class="w-full md:w-2/5 flex items-center justify-center p-8 md:border-r border-gray-100">
                 
-                <div class="bg-white p-6 md:p-10 rounded-xl flex flex-col items-center max-w-lg w-full">
+                <!-- Wheel Wrapper: Allows wheel to shrink on small screens (<300px) -->
+                <div class="max-w-[300px] w-full flex flex-col items-center"> 
                     
-                    <div class="wheel-area-container">
+                    <div class="wheel-area-container max-w-full max-h-full">
                         <div id="indicator"></div>
                         
                         <div id="wheelContainer">
+                            <!-- RESULT OVERLAY IS NOW INSIDE wheelContainer -->
+                            <div id="resultOverlay">
+                                <div id="winningNumber"></div>
+                            </div>
                             <!-- Segments and numbers generated via JS -->
-                        </div>
-                        
-                        <div id="resultOverlay">
-                            <div id="winningNumber"></div>
                         </div>
                     </div>
 
@@ -156,12 +153,13 @@
                             style="background-color: #6f6f6f; color: white; font-weight: normal;">
                         SPIN
                     </button>
-
                 </div>
+
             </div>
 
-            <!-- RIGHT COLUMN (60% Width) - Image Area -->
-            <div class="w-3/5 h-full bg-white flex items-center justify-center relative p-12">
+            <!-- RIGHT COLUMN (Image Area) -->
+            <!-- Full height on desktop, full width on mobile (for stacking) -->
+            <div class="w-full md:w-3/5 h-full bg-white flex items-center justify-center relative p-8 md:p-12 min-h-[300px]">
                 
                 <!-- Placeholder Text (Initial State) -->
                 <div id="placeholderText" class="text-gray-300 font-light text-2xl">
@@ -183,9 +181,7 @@
     <script>
         // CONFIGURATION
         const NUM_SEGMENTS = 18; 
-        // Change this to '.png' or '.jpg' if you decide not to use SVGs
         const IMAGE_EXTENSION = '.svg'; 
-        // Change this path if your images are in a deeper folder, e.g., 'assets/images/'
         const IMAGE_FOLDER = 'images/'; 
 
         const SEGMENT_ANGLE = 360 / NUM_SEGMENTS; 
@@ -205,8 +201,6 @@
         const COLOR_B = '#dfdfdf'; 
 
         // --- PRELOADING IMAGES ---
-        // This function loads all images into browser memory when the page loads
-        // so they appear instantly when the wheel stops.
         function preloadImages() {
             for (let i = 1; i <= NUM_SEGMENTS; i++) {
                 const img = new Image();
@@ -219,7 +213,10 @@
             let gradientString = "";
             let currentAngle = 0;
 
-            wheelContainer.innerHTML = '';
+            // Clear only existing elements (numbers), keep the overlay
+            // We use querySelectorAll to find and remove all .wheel-number elements
+            wheelContainer.querySelectorAll('.wheel-number').forEach(e => e.remove());
+
 
             for (let i = 0; i < NUM_SEGMENTS; i++) {
                 const color = i % 2 === 0 ? COLOR_A : COLOR_B;
@@ -233,11 +230,17 @@
                 numDiv.classList.add('wheel-number');
                 numDiv.innerText = number;
                 
+                // Position numbers: 122px is 40.66% of the 300px diameter
                 numDiv.style.transform = `translate(-50%, -50%) rotate(${segmentCenterAngle}deg) translate(0, -122px)`;
                 
+                // Append the number to the wheel container
                 wheelContainer.appendChild(numDiv);
                 currentAngle = endAngle;
             }
+            
+            // Ensure the result overlay is always on top of the numbers
+            wheelContainer.appendChild(resultOverlay);
+
 
             gradientString = gradientString.slice(0, -2);
             wheelContainer.style.background = `conic-gradient(from 0deg, ${gradientString})`;
@@ -284,8 +287,7 @@
             spinButton.disabled = true;
             resultOverlay.style.display = 'none';
             
-            // Reset right side (optional - keep previous result or clear it? Let's clear it for clarity)
-            // If you want to keep the previous image while spinning, remove these 3 lines:
+            // Clear right side
             prizeContainer.classList.add('hidden');
             prizeContainer.classList.remove('fade-in');
             placeholderText.style.display = 'block';
@@ -301,12 +303,22 @@
                 spinButton.disabled = false;
                 
                 winningNumberDisplay.textContent = winningNumber;
+                
+                // ----------------------------------------------------
+                // NEW LOGIC: Counter-rotate the overlay to keep the number upright
+                // 1. Calculate the final visual angle of the wheel (0 to 360 degrees)
+                const visualRotation = totalRotation % 360; 
+                
+                // 2. Apply the inverse rotation to the result overlay
+                resultOverlay.style.transform = `rotate(${-visualRotation}deg)`;
+                // ----------------------------------------------------
+
                 resultOverlay.style.display = 'flex';
                 
                 // Show the corresponding image
                 showPrizeImage(winningNumber);
                 
-                const visualRotation = totalRotation % 360;
+                // Reset transform property for next spin
                 wheelContainer.style.transition = 'none';
                 wheelContainer.style.transform = `rotate(${visualRotation}deg)`;
 
