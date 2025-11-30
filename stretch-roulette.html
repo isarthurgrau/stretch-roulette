@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stretch Roulette</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for the Wheel and Animation */
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e5e5e5; 
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        /* The main wheel container */
+        #wheelContainer {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #6f6f6f;
+            overflow: hidden; 
+            transition: transform 5s cubic-bezier(0.25, 0.1, 0.0, 1.0);
+            background-color: white; 
+        }
+
+        /* Styles for the numbers on the wheel */
+        .wheel-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            font-family: Arial, sans-serif;
+            font-weight: normal; 
+            color: #6f6f6f; 
+            font-size: 1.2rem;
+            pointer-events: none; 
+            text-align: center;
+            line-height: 1;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Fixed Arrow/Indicator at the top */
+        #indicator {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid #6f6f6f;
+            z-index: 30;
+        }
+
+        /* Overlay for the result */
+        #resultOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #6f6f6f;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20;
+            pointer-events: none; 
+            border: 3px solid #6f6f6f;
+        }
+
+        #winningNumber {
+            color: #6f6f6f;
+            font-size: 5rem; 
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .wheel-area-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Aspect Ratio Utility for the Frame */
+        .aspect-video-frame {
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            max-width: 1920px; 
+            background-color: #ffffff;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Fade in animation for the prize image */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Scalable 1920x1080 Frame -->
+    <div class="w-full max-w-[1920px] p-4 md:p-8 flex justify-center items-center">
+        
+        <div class="aspect-video-frame rounded-sm">
+            
+            <!-- LEFT COLUMN (40% Width) -->
+            <div class="w-2/5 h-full flex items-center justify-center p-8 border-r border-gray-100">
+                
+                <div class="bg-white p-6 md:p-10 rounded-xl flex flex-col items-center max-w-lg w-full">
+                    
+                    <div class="wheel-area-container">
+                        <div id="indicator"></div>
+                        
+                        <div id="wheelContainer">
+                            <!-- Segments and numbers generated via JS -->
+                        </div>
+                        
+                        <div id="resultOverlay">
+                            <div id="winningNumber"></div>
+                        </div>
+                    </div>
+
+                    <button id="spinButton" class="mt-8 px-6 py-3 text-lg rounded-lg shadow-md transition duration-150 transform hover:scale-105 active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            style="background-color: #6f6f6f; color: white; font-weight: normal;">
+                        SPIN
+                    </button>
+
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN (60% Width) - Image Area -->
+            <div class="w-3/5 h-full bg-white flex items-center justify-center relative p-12">
+                
+                <!-- Placeholder Text (Initial State) -->
+                <div id="placeholderText" class="text-gray-300 font-light text-2xl">
+                    Image Area
+                </div>
+
+                <!-- Prize Image Container (Hidden Initially) -->
+                <div id="prizeContainer" class="hidden w-full h-full flex items-center justify-center">
+                    <img id="prizeImage" src="" alt="Prize Result" class="max-h-full max-w-full object-contain drop-shadow-lg">
+                    <!-- Error message if file is missing -->
+                    <p id="imageError" class="hidden text-red-400 font-light">Image file not found</p>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURATION
+        const NUM_SEGMENTS = 18; 
+        // Change this to '.png' or '.jpg' if you decide not to use SVGs
+        const IMAGE_EXTENSION = '.svg'; 
+        // Change this path if your images are in a deeper folder, e.g., 'assets/images/'
+        const IMAGE_FOLDER = 'images/'; 
+
+        const SEGMENT_ANGLE = 360 / NUM_SEGMENTS; 
+        const wheelContainer = document.getElementById('wheelContainer');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const winningNumberDisplay = document.getElementById('winningNumber');
+        const spinButton = document.getElementById('spinButton');
+        
+        // Image Area Elements
+        const placeholderText = document.getElementById('placeholderText');
+        const prizeContainer = document.getElementById('prizeContainer');
+        const prizeImage = document.getElementById('prizeImage');
+        const imageError = document.getElementById('imageError');
+
+        let isSpinning = false;
+        const COLOR_A = '#ffffff'; 
+        const COLOR_B = '#dfdfdf'; 
+
+        // --- PRELOADING IMAGES ---
+        // This function loads all images into browser memory when the page loads
+        // so they appear instantly when the wheel stops.
+        function preloadImages() {
+            for (let i = 1; i <= NUM_SEGMENTS; i++) {
+                const img = new Image();
+                img.src = `${IMAGE_FOLDER}${i}${IMAGE_EXTENSION}`;
+            }
+            console.log("Images preloading started...");
+        }
+
+        function generateWheelSegments() {
+            let gradientString = "";
+            let currentAngle = 0;
+
+            wheelContainer.innerHTML = '';
+
+            for (let i = 0; i < NUM_SEGMENTS; i++) {
+                const color = i % 2 === 0 ? COLOR_A : COLOR_B;
+                const endAngle = currentAngle + SEGMENT_ANGLE;
+                gradientString += `${color} ${currentAngle}deg ${endAngle}deg, `;
+                
+                const number = i + 1;
+                const segmentCenterAngle = currentAngle + SEGMENT_ANGLE / 2;
+                
+                const numDiv = document.createElement('div');
+                numDiv.classList.add('wheel-number');
+                numDiv.innerText = number;
+                
+                numDiv.style.transform = `translate(-50%, -50%) rotate(${segmentCenterAngle}deg) translate(0, -122px)`;
+                
+                wheelContainer.appendChild(numDiv);
+                currentAngle = endAngle;
+            }
+
+            gradientString = gradientString.slice(0, -2);
+            wheelContainer.style.background = `conic-gradient(from 0deg, ${gradientString})`;
+        }
+
+        function calculateStopAngle(winningNumber) {
+            const segmentIndex = winningNumber - 1;
+            const centerAngle = segmentIndex * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2);
+            let stopAngle = 360 - centerAngle;
+            const fullRotations = 10;
+            const totalRotation = (fullRotations * 360) + stopAngle;
+            const jitterRange = SEGMENT_ANGLE * 0.8;
+            const jitter = (Math.random() * jitterRange) - (jitterRange / 2);
+            return totalRotation + jitter;
+        }
+
+        function showPrizeImage(number) {
+            // Hide placeholder
+            placeholderText.style.display = 'none';
+            
+            // Set image source
+            const imagePath = `${IMAGE_FOLDER}${number}${IMAGE_EXTENSION}`;
+            prizeImage.src = imagePath;
+            
+            // Reset error state
+            prizeImage.style.display = 'block';
+            imageError.style.display = 'none';
+
+            // Show container with fade animation
+            prizeContainer.classList.remove('hidden');
+            prizeContainer.classList.add('fade-in');
+            
+            // Handle image load errors (e.g. if file doesn't exist)
+            prizeImage.onerror = function() {
+                prizeImage.style.display = 'none';
+                imageError.style.display = 'block';
+                imageError.innerText = `File not found: ${imagePath}`;
+            };
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            spinButton.disabled = true;
+            resultOverlay.style.display = 'none';
+            
+            // Reset right side (optional - keep previous result or clear it? Let's clear it for clarity)
+            // If you want to keep the previous image while spinning, remove these 3 lines:
+            prizeContainer.classList.add('hidden');
+            prizeContainer.classList.remove('fade-in');
+            placeholderText.style.display = 'block';
+
+            const winningNumber = Math.floor(Math.random() * NUM_SEGMENTS) + 1;
+            const totalRotation = calculateStopAngle(winningNumber);
+
+            wheelContainer.style.transform = `rotate(${totalRotation}deg)`;
+            const transitionDuration = parseFloat(getComputedStyle(wheelContainer).transitionDuration) * 1000;
+
+            setTimeout(() => {
+                isSpinning = false;
+                spinButton.disabled = false;
+                
+                winningNumberDisplay.textContent = winningNumber;
+                resultOverlay.style.display = 'flex';
+                
+                // Show the corresponding image
+                showPrizeImage(winningNumber);
+                
+                const visualRotation = totalRotation % 360;
+                wheelContainer.style.transition = 'none';
+                wheelContainer.style.transform = `rotate(${visualRotation}deg)`;
+
+                setTimeout(() => {
+                    wheelContainer.style.transition = 'transform 5s cubic-bezier(0.25, 0.1, 0.0, 1.0)';
+                }, 50);
+
+            }, transitionDuration + 100);
+        }
+
+        wheelContainer.addEventListener('click', spinWheel);
+        spinButton.addEventListener('click', spinWheel);
+
+        window.onload = function() {
+            generateWheelSegments();
+            preloadImages(); // Start preloading images immediately
+        };
+
+    </script>
+</body>
+</html>
