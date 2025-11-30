@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Stretch Generator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for the Wheel and Animation */
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e5e5e5; /* Darker background to make the white frame pop */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        /* The main wheel container */
+        #wheelContainer {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #6f6f6f;
+            overflow: hidden; 
+            transition: transform 5s cubic-bezier(0.25, 0.1, 0.0, 1.0);
+            background-color: white; 
+        }
+
+        /* Styles for the numbers on the wheel */
+        .wheel-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            font-family: Arial, sans-serif; /* Simple Arial font */
+            font-weight: normal; /* Non-bold */
+            color: #6f6f6f; /* Specified gray color */
+            font-size: 1.2rem; /* Reduced size */
+            pointer-events: none; 
+            text-align: center;
+            line-height: 1;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Fixed Arrow/Indicator at the top */
+        #indicator {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid #6f6f6f;
+            z-index: 30;
+        }
+
+        /* Overlay for the result */
+        #resultOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #6f6f6f;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20;
+            pointer-events: none; 
+            border: 3px solid #6f6f6f;
+        }
+
+        #winningNumber {
+            color: #6f6f6f;
+            font-size: 5rem; 
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .wheel-area-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Aspect Ratio Utility for the Frame */
+        .aspect-video-frame {
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            max-width: 1920px; /* Max resolution width */
+            background-color: #ffffff;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Scalable 1920x1080 Frame -->
+    <!-- We use max-w-full and p-4 to ensure it scales down on smaller screens -->
+    <div class="w-full max-w-[1920px] p-4 md:p-8 flex justify-center items-center">
+        
+        <!-- Removed shadow-2xl class -->
+        <div class="aspect-video-frame rounded-sm">
+            
+            <!-- LEFT COLUMN (40% Width) -->
+            <div class="w-2/5 h-full flex items-center justify-center p-8 border-r border-gray-100">
+                
+                <!-- Main Card Container (Existing Pinwheel App) -->
+                <!-- Removed border classes (border border-gray-200) -->
+                <div class="bg-white p-6 md:p-10 rounded-xl flex flex-col items-center max-w-lg w-full">
+                    
+                    <div class="wheel-area-container">
+                        <div id="indicator"></div>
+                        
+                        <div id="wheelContainer">
+                            <!-- Segments and numbers generated via JS -->
+                        </div>
+                        
+                        <div id="resultOverlay">
+                            <div id="winningNumber"></div>
+                        </div>
+                    </div>
+
+                    <button id="spinButton" class="mt-8 px-6 py-3 text-lg rounded-lg shadow-md transition duration-150 transform hover:scale-105 active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            style="background-color: #6f6f6f; color: white; font-weight: normal;">
+                        SPIN
+                    </button>
+
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN (60% Width) - Placeholder for Images -->
+            <div class="w-3/5 h-full bg-white flex items-center justify-center relative">
+                <!-- This area is reserved for the images -->
+                <p class="text-gray-300 font-light text-2xl">Image Area</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const NUM_SEGMENTS = 18; 
+        const SEGMENT_ANGLE = 360 / NUM_SEGMENTS; 
+        const wheelContainer = document.getElementById('wheelContainer');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const winningNumberDisplay = document.getElementById('winningNumber');
+        const spinButton = document.getElementById('spinButton');
+        let isSpinning = false;
+
+        const COLOR_A = '#ffffff'; // White
+        const COLOR_B = '#dfdfdf'; // Gray
+
+        function generateWheelSegments() {
+            let gradientString = "";
+            let currentAngle = 0;
+
+            wheelContainer.innerHTML = '';
+
+            for (let i = 0; i < NUM_SEGMENTS; i++) {
+                // 1. Generate Gradient part
+                const color = i % 2 === 0 ? COLOR_A : COLOR_B;
+                const endAngle = currentAngle + SEGMENT_ANGLE;
+                gradientString += `${color} ${currentAngle}deg ${endAngle}deg, `;
+                
+                // 2. Generate Number part
+                const number = i + 1;
+                const segmentCenterAngle = currentAngle + SEGMENT_ANGLE / 2;
+                
+                const numDiv = document.createElement('div');
+                numDiv.classList.add('wheel-number');
+                numDiv.innerText = number;
+                
+                // Transform logic: 
+                // Center -> Rotate -> Push Out (122px) -> No final rotation (Bottom faces inside)
+                // Moved 13px inwards (135 - 13 = 122) to sit further from the border
+                numDiv.style.transform = `translate(-50%, -50%) rotate(${segmentCenterAngle}deg) translate(0, -122px)`;
+                
+                wheelContainer.appendChild(numDiv);
+
+                currentAngle = endAngle;
+            }
+
+            gradientString = gradientString.slice(0, -2);
+            wheelContainer.style.background = `conic-gradient(from 0deg, ${gradientString})`;
+        }
+
+        function calculateStopAngle(winningNumber) {
+            const segmentIndex = winningNumber - 1;
+            const centerAngle = segmentIndex * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2);
+            let stopAngle = 360 - centerAngle;
+            const fullRotations = 10;
+            const totalRotation = (fullRotations * 360) + stopAngle;
+            const jitterRange = SEGMENT_ANGLE * 0.8;
+            const jitter = (Math.random() * jitterRange) - (jitterRange / 2);
+            return totalRotation + jitter;
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            spinButton.disabled = true;
+            resultOverlay.style.display = 'none';
+
+            const winningNumber = Math.floor(Math.random() * NUM_SEGMENTS) + 1;
+            const totalRotation = calculateStopAngle(winningNumber);
+
+            wheelContainer.style.transform = `rotate(${totalRotation}deg)`;
+            const transitionDuration = parseFloat(getComputedStyle(wheelContainer).transitionDuration) * 1000;
+
+            setTimeout(() => {
+                isSpinning = false;
+                spinButton.disabled = false;
+                
+                winningNumberDisplay.textContent = winningNumber;
+                resultOverlay.style.display = 'flex';
+                
+                const visualRotation = totalRotation % 360;
+                wheelContainer.style.transition = 'none';
+                wheelContainer.style.transform = `rotate(${visualRotation}deg)`;
+
+                setTimeout(() => {
+                    wheelContainer.style.transition = 'transform 5s cubic-bezier(0.25, 0.1, 0.0, 1.0)';
+                }, 50);
+
+            }, transitionDuration + 100);
+        }
+
+        wheelContainer.addEventListener('click', spinWheel);
+        spinButton.addEventListener('click', spinWheel);
+
+        window.onload = generateWheelSegments;
+
+    </script>
+</body>
+</html>
